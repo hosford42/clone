@@ -60,7 +60,7 @@ def clone_from_url(source_url, parent=None):
     
     :param source_url: The URL where the source zip is located.
     :param parent: The parent folder where the repo should be cloned.
-    :return: None
+    :return: The path to the root folder of the repo.
     """
     if parent is None:
         parent = os.getcwd()
@@ -71,7 +71,23 @@ def clone_from_url(source_url, parent=None):
 
     try:
         with zipfile.ZipFile(zip_path) as repo:
+            root = None
+            for name in repo.namelist():
+                assert name and not name.startswith('/'), "Downloaded repo contained absolute path."
+                if name.count('/') == 1 and name.endswith('/'):
+                    root = name
+                    break
+            assert root is not None, "Downloaded repo was empty."
+
+            downloaded_path = os.path.join(parent, root)
+            if os.path.isdir(downloaded_path):
+                raise IsADirectoryError(downloaded_path)
+
             repo.extractall(parent)
+
+            if not os.path.isdir(downloaded_path):
+                raise NotADirectoryError(downloaded_path)
+            return downloaded_path
     finally:
         if os.path.isfile(zip_path):
             os.remove(zip_path)
@@ -94,6 +110,10 @@ def clone(repo, user, site, parent=None):
     elif not os.path.isdir(parent):
         raise NotADirectoryError(parent)
 
+    path = os.path.join(parent, repo)
+    if os.path.isdir(path):
+        raise IsADirectoryError(path)
+
     site = site.lower()
     if site not in URL_TEMPLATES:
         base = os.path.splitext(site)[0]
@@ -103,9 +123,10 @@ def clone(repo, user, site, parent=None):
 
     url = URL_TEMPLATES[site].format(user=user, repo=repo)
 
-    clone_from_url(url, parent)
+    # TODO: Download to a temporary folder first, then rename.
+    downloaded_path = clone_from_url(url, parent)
+    os.rename(downloaded_path, path)
 
-    path = os.path.join(parent, repo)
     if not os.path.isdir(path):
         raise NotADirectoryError(path)
 
@@ -175,7 +196,7 @@ def search(repos, users=None, sites=None):
         template = URL_TEMPLATES[site]
         for user in users:
             for repo in repos:
-                url = template.format(user, repo)
+                url = template.format(user=user, repo=repo)
                 try:
                     urllib.request.urlopen(url)
                 except (urllib.request.HTTPError, urllib.request.URLError):
