@@ -4,7 +4,7 @@ setup(
     name='clone',
     version='0.0',
     packages=['clone'],
-    url='https://pypi.python.org/pypi/clone',
+    url='https://github.com/hosford42/clone',
     license='MIT',
     author='Aaron Hosford',
     author_email='hosford42@gmail.com',
